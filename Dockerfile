@@ -4,7 +4,7 @@ FROM python:3.12.5-bullseye
 # Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies if needed, 
+# Install system dependencies if needed,
 # not supported by Nexus unfortunately
 RUN apt-get update -y
 RUN apt upgrade -y

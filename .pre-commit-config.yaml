@@ -1,0 +1,80 @@
+minimum_pre_commit_version: "4.0.0"
+
+default_language_version:
+  python: python3.12
+
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-ast
+        name: Validate Python syntax
+
+      - id: check-case-conflict
+        name: Detect case-insensitive filename conflicts
+
+      - id: check-docstring-first
+        name: Ensure module docstrings appear first
+
+      - id: check-json
+        name: Validate JSON files
+
+      - id: check-merge-conflict
+        name: Detect unresolved merge conflict markers
+
+      - id: check-toml
+        name: Validate TOML files
+
+      - id: check-yaml
+        name: Validate YAML files
+
+      - id: debug-statements
+        name: Detect Python debug statements
+
+      - id: detect-private-key
+        name: Detect private keys
+
+      - id: end-of-file-fixer
+        name: Ensure files end with a newline
+
+      - id: fix-byte-order-marker
+        name: Remove UTF-8 byte order markers
+
+      - id: mixed-line-ending
+        name: Normalize line endings to LF
+        args:
+          - --fix=lf
+
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+
+      - id: check-added-large-files
+        name: Prevent accidentally committed large files
+        args:
+          - --maxkb=1024
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff-check
+        name: Ruff lint
+        args:
+          - --fix
+        types_or:
+          - python
+          - pyi
+
+      - id: ruff-format
+        name: Ruff format
+        types_or:
+          - python
+          - pyi
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        name: Detect staged secrets with Gitleaks
+        args: ["--pre-commit"]

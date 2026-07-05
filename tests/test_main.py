@@ -8,8 +8,9 @@ various endpoints under normal and edge-case scenarios.
 
 # pylint: disable=wrong-import-position
 
-import sys
 import os
+import sys
+
 from fastapi.testclient import TestClient
 
 # Add the parent directory to the system path for imports

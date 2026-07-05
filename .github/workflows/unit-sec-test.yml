@@ -2,7 +2,7 @@ name: Unit and Security Scanning
 on:
   workflow_call:
 
-jobs: 
+jobs:
     # Run unit test cases for the Docker image
   unit_test:
     name: Run unit test
@@ -12,14 +12,14 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-    
+
     - name: Run tests
       run: pytest tests/
-  
+
   # Scan the contianer and lists all security vulnerabilities
   trivy_scans:
     name: Run Trivy security scanner against the image
@@ -51,14 +51,14 @@ jobs:
         steps:
           - name: Checkout
             uses: actions/checkout@v4
-          
+
           # Build and Tag Image
           # Run Docker Image in detached mode
           - name: Build Docker Image
             run: |
               docker build -t python-fastapi:${{ github.sha }} .
               docker run -d -p 8080:8080 python-fastapi:${{ github.sha }}
-              
+
           - name: Wait for Docker container to be ready
             run: sleep 30
 
