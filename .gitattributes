@@ -14,3 +14,5 @@ Makefile text eol=lf
 *.jpeg binary
 *.gif binary
 *.pdf binary
+*.txt text eol=lf
+requirements*.txt text eol=lf
