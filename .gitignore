@@ -181,3 +181,4 @@ gitleaks-report.*
 semgrep-report.*
 trivy-report.*
 zap-report.*
+leaks.json
