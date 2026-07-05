@@ -64,7 +64,7 @@ def read_file(file_path: str):
         HTTPException: If the file cannot be read.
     """
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             return {"content": file.read()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

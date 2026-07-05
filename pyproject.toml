@@ -1,0 +1,50 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+    ".git",
+    ".venv",
+    "htmlcov",
+    "reports",
+]
+
+[tool.ruff.lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+    "B",
+    "UP",
+]
+ignore = [
+    # Temporary baseline exception.
+    # The original application raises inside `except` without `from`.
+    # This exception must be removed during the hardening phase.
+    "B904",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    # The original template modifies sys.path before importing the application.
+    # Tests will be reorganized during application hardening.
+    "E402",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+]
