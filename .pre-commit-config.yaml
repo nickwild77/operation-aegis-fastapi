@@ -77,4 +77,4 @@ repos:
     hooks:
       - id: gitleaks
         name: Detect staged secrets with Gitleaks
-        args: ["--pre-commit"]
+        args: ["--staged"]
