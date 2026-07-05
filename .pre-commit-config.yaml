@@ -78,3 +78,9 @@ repos:
       - id: gitleaks
         name: Detect staged secrets with Gitleaks
         args: ["--staged"]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
