@@ -14,7 +14,9 @@ DOCS_PATHS = {
 }
 
 
-class SecurityHeadersMiddleware:
+# ASGI middleware implements the callable protocol and intentionally
+# exposes only __call__.
+class SecurityHeadersMiddleware:  # pylint: disable=too-few-public-methods
     """Add security headers without BaseHTTPMiddleware or call_next."""
 
     def __init__(

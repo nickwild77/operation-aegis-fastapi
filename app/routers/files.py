@@ -141,7 +141,7 @@ async def upload_file(
     request: Request,
     file: Annotated[
         UploadFile,
-        File(description=("UTF-8 text, CSV, or JSON file")),
+        File(description="UTF-8 text, CSV, or JSON file"),
     ],
 ) -> UploadResponse:
     """Store a bounded upload using a random identifier."""
