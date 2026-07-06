@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
+from anyio import Path as AsyncPath
+from anyio import open_file
 from fastapi import (
     APIRouter,
     File,
@@ -105,10 +107,20 @@ def validate_upload_metadata(
     return extension, content_type
 
 
-def validate_saved_json(destination: Path) -> None:
-    """Require syntactically valid JSON."""
+async def validate_saved_json(
+    destination: Path,
+) -> None:
+    """Require syntactically valid UTF-8 JSON."""
     try:
-        json.loads(destination.read_text(encoding="utf-8"))
+        async with await open_file(
+            destination,
+            mode="r",
+            encoding="utf-8",
+        ) as uploaded_file:
+            content = await uploaded_file.read()
+
+        json.loads(content)
+
     except (
         OSError,
         UnicodeDecodeError,
@@ -140,7 +152,7 @@ async def upload_file(
         settings,
     )
 
-    settings.upload_directory.mkdir(
+    await AsyncPath(settings.upload_directory).mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -157,7 +169,10 @@ async def upload_file(
     decoder = codecs.getincrementaldecoder("utf-8")("strict")
 
     try:
-        with destination.open("xb") as output:
+        async with await open_file(
+            destination,
+            mode="xb",
+        ) as output:
             while chunk := await file.read(CHUNK_SIZE):
                 size += len(chunk)
 
@@ -175,7 +190,7 @@ async def upload_file(
                         detail=("Uploaded file must contain valid UTF-8 text"),
                     ) from exc
 
-                output.write(chunk)
+                await output.write(chunk)
 
             try:
                 decoder.decode(b"", final=True)
@@ -192,14 +207,14 @@ async def upload_file(
             )
 
         if extension == ".json":
-            validate_saved_json(destination)
+            await validate_saved_json(destination)
 
     except HTTPException:
-        destination.unlink(missing_ok=True)
+        await remove_file_if_exists(destination)
         raise
 
     except OSError as exc:
-        destination.unlink(missing_ok=True)
+        await remove_file_if_exists(destination)
 
         logger.error(
             "Unable to store uploaded file",
@@ -223,6 +238,19 @@ async def upload_file(
         size_bytes=size,
         content_type=content_type,
     )
+
+
+async def remove_file_if_exists(
+    destination: Path,
+) -> None:
+    """Remove a partially written file."""
+    try:
+        await AsyncPath(destination).unlink(missing_ok=True)
+    except OSError:
+        logger.exception(
+            "Unable to remove incomplete upload: %s",
+            destination.name,
+        )
 
 
 @router.get(
