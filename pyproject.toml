@@ -4,6 +4,7 @@ line-length = 100
 extend-exclude = [
     ".git",
     ".venv",
+    "data",
     "htmlcov",
     "reports",
 ]
@@ -17,19 +18,15 @@ select = [
     "I",
     "B",
     "UP",
+    "S",
 ]
-ignore = [
-    # Temporary baseline exception.
-    # The original application raises inside `except` without `from`.
-    # This exception must be removed during the hardening phase.
-    "B904",
-]
+ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
-    # The original template modifies sys.path before importing the application.
-    # Tests will be reorganized during application hardening.
-    "E402",
+    "S101",
+    "S105",
+    "S106",
 ]
 
 [tool.ruff.format]
@@ -47,4 +44,29 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
 ]
+
+[tool.coverage.run]
+branch = true
+source = [
+    "app",
+]
+omit = [
+    "app/main.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]

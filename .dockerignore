@@ -34,3 +34,6 @@ uploaded_file
 
 *.log
 *.tar
+
+# Runtime-generated application state
+data
