@@ -182,3 +182,7 @@ semgrep-report.*
 trivy-report.*
 zap-report.*
 leaks.json
+
+# Operation Aegis runtime data
+data/*
+!data/.gitkeep

@@ -23,6 +23,7 @@ help:
 	@echo "  make docker-run    Run the local Docker container"
 	@echo "  make docker-stop   Stop and remove the local container"
 	@echo "  make clean         Remove local generated files"
+	@echo "  make run           Run the FastAPI development server"
 
 .PHONY: install
 install:
@@ -57,9 +58,12 @@ docker-build:
 
 .PHONY: docker-run
 docker-run:
+	@test -f .env || \
+		(echo ".env is missing; copy .env.example to .env" && exit 1)
 	docker run \
 		--detach \
 		--name $(CONTAINER_NAME) \
+		--env-file .env \
 		--publish $(APP_PORT):8080 \
 		$(IMAGE_NAME):$(IMAGE_TAG)
 
@@ -73,3 +77,13 @@ clean:
 	rm -rf .pytest_cache .ruff_cache htmlcov reports/*
 	rm -f .coverage coverage.xml uploaded_file
 	touch reports/.gitkeep
+
+.PHONY: run
+run:
+	@test -f .env || \
+		(echo ".env is missing; copy .env.example to .env" && exit 1)
+	$(VENV)/bin/uvicorn \
+		app.main:app \
+		--host 127.0.0.1 \
+		--port $(APP_PORT) \
+		--reload
