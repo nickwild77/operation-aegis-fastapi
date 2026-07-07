@@ -1,0 +1,15 @@
+# Security-sensitive automation
+/.github/workflows/ @nickwild77
+/.github/dependabot.yml @nickwild77
+
+# Build and dependency chain
+/Dockerfile @nickwild77
+/requirements.in @nickwild77
+/requirements.txt @nickwild77
+/requirements-dev.in @nickwild77
+/requirements-dev.txt @nickwild77
+
+# Security configuration
+/.zap/ @nickwild77
+/.gitleaks.toml @nickwild77
+/.pre-commit-config.yaml @nickwild77
