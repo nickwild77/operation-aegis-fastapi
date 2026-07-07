@@ -279,6 +279,7 @@ jobs:
 
           python -m pip install \
             --require-hashes \
+            --no-deps \
             --requirement requirements-dev.txt
 
       - name: Audit production dependencies
