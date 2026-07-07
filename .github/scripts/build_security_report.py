@@ -12,10 +12,12 @@ REPORT_DIR = Path("reports")
 
 
 def env(name: str, default: str = "") -> str:
+    """Read an environment variable with a default."""
     return os.environ.get(name, default)
 
 
 def load_json(path: str, default: dict[str, Any]) -> dict[str, Any]:
+    """Load JSON from disk or return a default object."""
     file_path = Path(path)
     if not file_path.exists():
         return default
@@ -25,6 +27,7 @@ def load_json(path: str, default: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_result(result: str) -> str:
+    """Normalize GitHub job and check states for report display."""
     result = (result or "unknown").lower()
 
     if result == "success":
@@ -42,6 +45,7 @@ def normalize_result(result: str) -> str:
 
 
 def conclusion_from_check_run(check_run: dict[str, Any]) -> str:
+    """Convert a GitHub check run into a normalized result."""
     if check_run.get("status") != "completed":
         return normalize_result(str(check_run.get("status", "pending")))
 
@@ -49,6 +53,7 @@ def conclusion_from_check_run(check_run: dict[str, Any]) -> str:
 
 
 def conclusion_from_status(status: dict[str, Any]) -> str:
+    """Convert a GitHub commit status into a normalized result."""
     state = str(status.get("state", "unknown")).lower()
 
     if state == "success":
@@ -65,6 +70,7 @@ def find_sonar_result(
     check_runs: dict[str, Any],
     commit_status: dict[str, Any],
 ) -> dict[str, str]:
+    """Find the SonarQube check result from GitHub checks or statuses."""
     for check_run in check_runs.get("check_runs", []):
         haystack = " ".join(
             [
@@ -108,6 +114,7 @@ def find_sonar_result(
 
 
 def status_badge(status: str) -> str:
+    """Return a human-readable status label."""
     labels = {
         "passed": "passed",
         "failed": "failed",
@@ -120,12 +127,14 @@ def status_badge(status: str) -> str:
 
 
 def markdown_link(label: str, url: str) -> str:
+    """Render a Markdown link when a URL is available."""
     if not url:
         return label
     return f"[{label}]({url})"
 
 
 def build_reports() -> dict[str, Any]:
+    """Build JSON, Markdown, PR comment, and issue report files."""
     check_runs = load_json("check-runs.json", {"check_runs": []})
     commit_status = load_json("commit-status.json", {"statuses": []})
     sonar = find_sonar_result(check_runs, commit_status)
@@ -216,6 +225,7 @@ def build_reports() -> dict[str, Any]:
 
 
 def render_markdown_report(payload: dict[str, Any]) -> str:
+    """Render the consolidated pull request security report."""
     lines = [
         "## Operation Aegis security report",
         "",
@@ -230,13 +240,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     for control in payload["controls"]:
         details = markdown_link("open", control.get("details", ""))
         lines.append(
-            "| {layer} | {control} | {tooling} | {status} | {details} |".format(
-                layer=control["layer"],
-                control=control["control"],
-                tooling=control["tooling"],
-                status=status_badge(control["status"]),
-                details=details,
-            )
+            f"| {control['layer']} | {control['control']} | {control['tooling']} | "
+            f"{status_badge(control['status'])} | {details} |"
         )
 
     lines.extend(
@@ -261,6 +266,7 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
 
 
 def render_issue_body(payload: dict[str, Any]) -> str:
+    """Render the GitHub Issue body for failed security controls."""
     lines = [
         "<!-- operation-aegis-security-issue -->",
         "## Operation Aegis security failure",
@@ -275,12 +281,8 @@ def render_issue_body(payload: dict[str, Any]) -> str:
 
     for control in payload["failed_controls"]:
         lines.append(
-            "- {layer}: {control} ({tooling}) - {details}".format(
-                layer=control["layer"],
-                control=control["control"],
-                tooling=control["tooling"],
-                details=markdown_link("details", control.get("details", "")),
-            )
+            f"- {control['layer']}: {control['control']} ({control['tooling']}) - "
+            f"{markdown_link('details', control.get('details', ''))}"
         )
 
     lines.extend(
@@ -294,6 +296,7 @@ def render_issue_body(payload: dict[str, Any]) -> str:
 
 
 def main() -> None:
+    """Generate reports and expose failure state to GitHub Actions."""
     payload = build_reports()
     github_output = env("GITHUB_OUTPUT")
 
