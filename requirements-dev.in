@@ -1,0 +1,11 @@
+-c requirements.txt
+
+black
+httpx
+pip-audit
+pip-tools
+pre-commit
+pylint
+pytest
+pytest-cov
+ruff

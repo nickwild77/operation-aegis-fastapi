@@ -1,0 +1,7 @@
+anyio
+fastapi
+pydantic
+pydantic-settings
+python-multipart
+starlette
+uvicorn

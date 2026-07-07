@@ -87,3 +87,28 @@ run:
 		--host 127.0.0.1 \
 		--port $(APP_PORT) \
 		--reload
+
+.PHONY: lock
+lock:
+	CUSTOM_COMPILE_COMMAND="make lock" \
+	$(VENV_PYTHON) -m piptools compile \
+		--upgrade \
+		--generate-hashes \
+		--resolver=backtracking \
+		--output-file=requirements.txt \
+		requirements.in
+
+	CUSTOM_COMPILE_COMMAND="make lock" \
+	$(VENV_PYTHON) -m piptools compile \
+		--upgrade \
+		--generate-hashes \
+		--resolver=backtracking \
+		--output-file=requirements-dev.txt \
+		requirements-dev.in
+
+.PHONY: audit
+audit:
+	$(VENV_PYTHON) -m pip_audit \
+		--requirement requirements.txt \
+		--strict \
+		--disable-pip
