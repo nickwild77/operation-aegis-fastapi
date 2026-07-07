@@ -29,8 +29,8 @@ merge.
 | SAST | SonarQube GitHub integration on pull requests and `main` | SonarQube pull request check |
 | SCA | Trivy image scanning, pip-audit, GitHub Dependency Review, Dependabot | Code Scanning SARIF, PR comments, workflow logs |
 | DAST | OWASP ZAP API scan against an ephemeral Docker deployment | Workflow artifact and check result |
-| Secrets | Gitleaks workflow, pre-commit Gitleaks hook, detect-secrets baseline | PR comment, SARIF artifact, Code Scanning upload |
-| Reporting | PR security summary, SBOM artifacts, release attestations | GitHub Actions summary, artifacts, GitHub Security |
+| Secrets | PR Gitleaks gate, standalone Gitleaks workflow, pre-commit Gitleaks hook, detect-secrets baseline | Consolidated PR report, SARIF artifact, Code Scanning upload |
+| Reporting | PR security summary, GitHub Issues, Markdown/JSON report artifacts, SBOM artifacts, release attestations | GitHub Actions summary, PR comments, artifacts, GitHub Security |
 
 Security architecture and operating notes are documented in
 [`docs/operation-aegis-security.md`](docs/operation-aegis-security.md).

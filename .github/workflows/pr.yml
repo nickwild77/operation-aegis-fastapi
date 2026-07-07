@@ -1,4 +1,5 @@
 name: PR Workflow
+
 on:
   pull_request:
     types:
@@ -11,90 +12,206 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  checks: read
+  statuses: read
   pull-requests: write
   issues: write
 
 jobs:
-    build-image:
-        uses: ./.github/workflows/build-image.yml
+  build-image:
+    uses: ./.github/workflows/build-image.yml
 
-    lint-format:
-        uses: ./.github/workflows/lint-format.yml
-        needs: build-image
+  lint-format:
+    uses: ./.github/workflows/lint-format.yml
+    needs: build-image
 
-    unit-sec-scan:
-        uses: ./.github/workflows/unit-sec-test.yml
-        needs: lint-format
+  unit-sec-scan:
+    uses: ./.github/workflows/unit-sec-test.yml
+    needs: lint-format
 
-    security-summary:
-        name: Publish security feedback
-        runs-on: ubuntu-latest
-        needs:
-          - build-image
-          - lint-format
-          - unit-sec-scan
-        if: always()
+  secret-scan:
+    name: Detect committed secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-        steps:
-          - name: Write security summary
-            shell: bash
-            run: |
-              set -euo pipefail
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
-              {
-                echo "## Operation Aegis PR security feedback"
-                echo
-                echo "| Check | Result |"
-                echo "|---|---|"
-                echo "| Build Docker image | ${{ needs.build-image.result }} |"
-                echo "| Lint and formatting | ${{ needs.lint-format.result }} |"
-                echo "| Unit tests, Trivy, pip-audit, OWASP ZAP | ${{ needs.unit-sec-scan.result }} |"
-                echo "| SonarQube SAST | External required GitHub check |"
-                echo
-                echo "Review failed checks before merge. Security reports are available in the workflow summary, GitHub Code Scanning, and uploaded artifacts."
-              } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Run Gitleaks
+        id: gitleaks
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
 
-          - name: Comment security summary on pull request
-            continue-on-error: true
-            env:
-              GH_TOKEN: ${{ github.token }}
-              PR_NUMBER: ${{ github.event.pull_request.number }}
-              REPOSITORY: ${{ github.repository }}
-            shell: bash
-            run: |
-              set -euo pipefail
+          docker run \
+            --rm \
+            --volume "${PWD}:/repo" \
+            --workdir /repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.0 \
+            detect \
+            --source=. \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact \
+            --report-format=sarif \
+            --report-path=gitleaks-results.sarif \
+            --exit-code=1 \
+            --verbose
 
-              marker="<!-- operation-aegis-security-summary -->"
-              comment_file="${RUNNER_TEMP}/security-summary-comment.md"
+          exit_code="$?"
+          echo "exit_code=${exit_code}" >> "${GITHUB_OUTPUT}"
+          exit "${exit_code}"
 
-              {
-                echo "${marker}"
-                echo "## Operation Aegis security summary"
-                echo
-                echo "| Check | Result |"
-                echo "|---|---|"
-                echo "| Build Docker image | ${{ needs.build-image.result }} |"
-                echo "| Lint and formatting | ${{ needs.lint-format.result }} |"
-                echo "| Unit tests, Trivy, pip-audit, OWASP ZAP | ${{ needs.unit-sec-scan.result }} |"
-                echo "| SonarQube SAST | External required GitHub check |"
-                echo
-                echo "Reports: Trivy SARIF is uploaded to GitHub Code Scanning, SBOM and ZAP outputs are available as workflow artifacts, and SonarQube publishes its own pull request check."
-              } > "${comment_file}"
+      - name: Upload Gitleaks SARIF
+        if: always() && hashFiles('gitleaks-results.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks-secrets-pr
 
-              comment_id="$(
-                gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
-                  --jq '.[] | select(.user.type == "Bot" and (.body | contains("<!-- operation-aegis-security-summary -->"))) | .id' \
-                  | head -n 1
-              )"
+      - name: Upload Gitleaks artifact
+        if: always() && hashFiles('gitleaks-results.sarif') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gitleaks-pr-sarif-${{ github.sha }}
+          path: gitleaks-results.sarif
+          retention-days: 30
+          if-no-files-found: error
 
-              if [ -n "${comment_id}" ]; then
-                gh api \
-                  --method PATCH \
-                  "repos/${REPOSITORY}/issues/comments/${comment_id}" \
-                  -f body="$(cat "${comment_file}")"
-              else
-                gh api \
-                  --method POST \
-                  "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
-                  -f body="$(cat "${comment_file}")"
-              fi
+      - name: Enforce secret scanning gate
+        if: steps.gitleaks.outputs.exit_code != '0'
+        run: |
+          echo "::error::Gitleaks detected committed secrets"
+          exit 1
+
+  security-summary:
+    name: Publish security feedback
+    runs-on: ubuntu-latest
+    needs:
+      - build-image
+      - lint-format
+      - unit-sec-scan
+      - secret-scan
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Collect GitHub check data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh api \
+            "repos/${REPOSITORY}/commits/${HEAD_SHA}/check-runs?per_page=100" \
+            > check-runs.json
+
+          gh api \
+            "repos/${REPOSITORY}/commits/${HEAD_SHA}/status" \
+            > commit-status.json
+
+      - name: Generate consolidated security report
+        id: report
+        env:
+          BUILD_RESULT: ${{ needs.build-image.result }}
+          LINT_RESULT: ${{ needs.lint-format.result }}
+          UNIT_SEC_RESULT: ${{ needs.unit-sec-scan.result }}
+          SECRET_RESULT: ${{ needs.secret-scan.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: python3 .github/scripts/build_security_report.py
+
+      - name: Publish report to workflow summary
+        run: cat reports/security-report.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload consolidated security report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: operation-aegis-security-report-${{ github.sha }}
+          path: |
+            reports/security-report.md
+            reports/security-report.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Comment security summary on pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          comment_id="$(
+            gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --jq '.[] | select(.user.type == "Bot" and (.body | contains("<!-- operation-aegis-security-summary -->"))) | .id' \
+              | head -n 1
+          )"
+
+          if [ -n "${comment_id}" ]; then
+            gh api \
+              --method PATCH \
+              "repos/${REPOSITORY}/issues/comments/${comment_id}" \
+              -f body="$(cat reports/security-comment.md)"
+          else
+            gh api \
+              --method POST \
+              "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -f body="$(cat reports/security-comment.md)"
+          fi
+
+      - name: Create or resolve security issue
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_FAILURES: ${{ steps.report.outputs.has_failures }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          issue_title="[Security] Operation Aegis checks failing for PR #${PR_NUMBER}"
+          issues_json="$(gh issue list --state open --limit 100 --json number,title)"
+
+          issue_number="$(
+            ISSUES_JSON="${issues_json}" ISSUE_TITLE="${issue_title}" python3 - <<'PY'
+          import json
+          import os
+
+          for issue in json.loads(os.environ["ISSUES_JSON"]):
+              if issue["title"] == os.environ["ISSUE_TITLE"]:
+                  print(issue["number"])
+                  break
+          PY
+          )"
+
+          if [ "${HAS_FAILURES}" = "true" ]; then
+            if [ -n "${issue_number}" ]; then
+              gh issue edit "${issue_number}" --body-file reports/security-issue.md
+            else
+              gh issue create \
+                --title "${issue_title}" \
+                --body-file reports/security-issue.md
+            fi
+          elif [ -n "${issue_number}" ]; then
+            gh issue comment \
+              "${issue_number}" \
+              --body "Operation Aegis security checks are no longer failing for PR #${PR_NUMBER}."
+            gh issue close "${issue_number}" \
+              --comment "Closing because the latest consolidated Operation Aegis report has no failed controls."
+          fi
