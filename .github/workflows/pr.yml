@@ -11,6 +11,8 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  pull-requests: write
+  issues: write
 
 jobs:
     build-image:
@@ -23,3 +25,76 @@ jobs:
     unit-sec-scan:
         uses: ./.github/workflows/unit-sec-test.yml
         needs: lint-format
+
+    security-summary:
+        name: Publish security feedback
+        runs-on: ubuntu-latest
+        needs:
+          - build-image
+          - lint-format
+          - unit-sec-scan
+        if: always()
+
+        steps:
+          - name: Write security summary
+            shell: bash
+            run: |
+              set -euo pipefail
+
+              {
+                echo "## Operation Aegis PR security feedback"
+                echo
+                echo "| Check | Result |"
+                echo "|---|---|"
+                echo "| Build Docker image | ${{ needs.build-image.result }} |"
+                echo "| Lint and formatting | ${{ needs.lint-format.result }} |"
+                echo "| Unit tests, Trivy, pip-audit, OWASP ZAP | ${{ needs.unit-sec-scan.result }} |"
+                echo "| SonarQube SAST | External required GitHub check |"
+                echo
+                echo "Review failed checks before merge. Security reports are available in the workflow summary, GitHub Code Scanning, and uploaded artifacts."
+              } >> "${GITHUB_STEP_SUMMARY}"
+
+          - name: Comment security summary on pull request
+            continue-on-error: true
+            env:
+              GH_TOKEN: ${{ github.token }}
+              PR_NUMBER: ${{ github.event.pull_request.number }}
+              REPOSITORY: ${{ github.repository }}
+            shell: bash
+            run: |
+              set -euo pipefail
+
+              marker="<!-- operation-aegis-security-summary -->"
+              comment_file="${RUNNER_TEMP}/security-summary-comment.md"
+
+              {
+                echo "${marker}"
+                echo "## Operation Aegis security summary"
+                echo
+                echo "| Check | Result |"
+                echo "|---|---|"
+                echo "| Build Docker image | ${{ needs.build-image.result }} |"
+                echo "| Lint and formatting | ${{ needs.lint-format.result }} |"
+                echo "| Unit tests, Trivy, pip-audit, OWASP ZAP | ${{ needs.unit-sec-scan.result }} |"
+                echo "| SonarQube SAST | External required GitHub check |"
+                echo
+                echo "Reports: Trivy SARIF is uploaded to GitHub Code Scanning, SBOM and ZAP outputs are available as workflow artifacts, and SonarQube publishes its own pull request check."
+              } > "${comment_file}"
+
+              comment_id="$(
+                gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                  --jq '.[] | select(.user.type == "Bot" and (.body | contains("<!-- operation-aegis-security-summary -->"))) | .id' \
+                  | head -n 1
+              )"
+
+              if [ -n "${comment_id}" ]; then
+                gh api \
+                  --method PATCH \
+                  "repos/${REPOSITORY}/issues/comments/${comment_id}" \
+                  -f body="$(cat "${comment_file}")"
+              else
+                gh api \
+                  --method POST \
+                  "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                  -f body="$(cat "${comment_file}")"
+              fi

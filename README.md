@@ -1,4 +1,7 @@
-# Python FastAPI
+# Operation Aegis FastAPI
+
+[![Security Scans Passing](https://github.com/nickwild77/operation-aegis-fastapi/actions/workflows/pr.yml/badge.svg)](https://github.com/nickwild77/operation-aegis-fastapi/actions/workflows/pr.yml)
+[![Secret Scanning](https://github.com/nickwild77/operation-aegis-fastapi/actions/workflows/secrets-scan.yml/badge.svg)](https://github.com/nickwild77/operation-aegis-fastapi/actions/workflows/secrets-scan.yml)
 
 This project sets up a simple FastAPI application (with some vulnerabilites) within a Docker container. It uses the official Python runtime and includes all necessary configurations to deploy a FastAPI app with Docker. The container will expose the app on port 80 and automatically run the FastAPI app on startup.
 
@@ -14,6 +17,23 @@ This project sets up a simple FastAPI application (with some vulnerabilites) wit
 - **Dockerized FastAPI application**: A containerized setup for easy deployment.
 - **Python 3.12.5 runtime**: Uses the latest stable Python version as a base.
 - **Efficient package installation**: Installs required dependencies via `requirements.txt`.
+- **Operation Aegis security gates**: Pull requests are checked with SonarQube, Trivy, pip-audit, OWASP ZAP, Dependency Review, and Gitleaks.
+
+## Operation Aegis security pipeline
+
+The project uses GitHub Actions and SonarQube to block unsafe changes before
+merge.
+
+| Layer | Implementation | Feedback |
+|---|---|---|
+| SAST | SonarQube GitHub integration on pull requests and `main` | SonarQube pull request check |
+| SCA | Trivy image scanning, pip-audit, GitHub Dependency Review, Dependabot | Code Scanning SARIF, PR comments, workflow logs |
+| DAST | OWASP ZAP API scan against an ephemeral Docker deployment | Workflow artifact and check result |
+| Secrets | Gitleaks workflow, pre-commit Gitleaks hook, detect-secrets baseline | PR comment, SARIF artifact, Code Scanning upload |
+| Reporting | PR security summary, SBOM artifacts, release attestations | GitHub Actions summary, artifacts, GitHub Security |
+
+Security architecture and operating notes are documented in
+[`docs/operation-aegis-security.md`](docs/operation-aegis-security.md).
 
 ## Project Structure
 
@@ -45,7 +65,7 @@ cd python-fastapi
 To build the Docker image, run the following command in the root of the project directory:
 
 ```bash
-docker build -t python-fastapi .
+docker build -t operation-aegis:phase3 .
 ```
 
 ### 3. Run the Docker container
@@ -53,7 +73,7 @@ docker build -t python-fastapi .
 After the image is built, run the container:
 
 ```bash
-docker run -d -p 80:80 python-fastapi
+docker run --env-file .env -p 80:8080 operation-aegis:phase3
 ```
 
 This command will run the FastAPI app on port 80 of your localhost.
