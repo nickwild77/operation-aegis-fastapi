@@ -20,8 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
           python -m pip install --upgrade pip
+          python -m pip install --requirement requirements-dev.txt
 
       - name: Run pylint
         run: pylint .
@@ -44,8 +44,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
           python -m pip install --upgrade pip
+          python -m pip install --requirement requirements-dev.txt
 
       - name: Run black
         run: black --check .
